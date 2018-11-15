@@ -6,6 +6,20 @@ import numpy as np
 import base64
 import queue
 
+#coordinate threads with binary/counting semaphores between 2 producers, 2 consumers
+#thread 0 reads frames from file
+#thread 1 will take the frames and convert to grayscale
+#thread 2 will display the frames
+#all threads run concurrently
+
+#semaphore for the system
+syncSemaphore = threading.Semaphore()
+
+readThread = threading.Thread()# make target = extractFrames
+grayscaleThread = threading.Thread() #make target = ConvertToGrayscale
+displayThread = threading.Thread() #make target = DisplayFrames
+
+
 def extractFrames(fileName, outputBuffer):
     # Initialize frame count 
     count = 0
