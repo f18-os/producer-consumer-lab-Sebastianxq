@@ -124,9 +124,9 @@ syncSemaphore = threading.Semaphore()
 
 extractionQueue = queue.Queue() #shared queue, limited to 10 objects at a time
 
-grayT = threading.Thread(target = convertToGray, args= (filename,extractionQueue)) #make target = ConvertToGrayscale
-extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))# make target = extractFrames
-displayT = threading.Thread(target = displayFrames, args=(extractionQueue,)) #make target = DisplayFrames
+extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
+grayT = threading.Thread(target = convertToGray, args= (extractionQueue)) 
+displayT = threading.Thread(target = displayFrames, args=(extractionQueue,)) 
 
 # extract the frames
 #extractFrames(filename,extractionQueue)
@@ -137,7 +137,7 @@ displayT = threading.Thread(target = displayFrames, args=(extractionQueue,)) #ma
 #gray has issues putting frames into buffer
 #try:
 extractFrames(filename,extractionQueue)
-convertToGray(filename,extractionQueue)
+convertToGray(extractionQueue)
 #somethign wrong with gray file, perhaps im not using the methods correctly
      
      #extractT.start()
