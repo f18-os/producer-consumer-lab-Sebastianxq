@@ -5,51 +5,54 @@ import cv2
 import numpy as np
 import base64
 import queue
+import time
 
-#coordinate threads with binary/counting semaphores between 2 producers, 2 consumers
-#thread 0 reads frames from file
-#thread 1 will take the frames and convert to grayscale
-#thread 2 will display the frames
-#all threads run concurrently
 
-#newSteps
-#create producer consumer relationshipfor grayscale and extract
-#create producer consumer for extract and display (already exists??)
-
-#takes in file, outputs the frame in gray
-def convertToGray(fileName, outputBuffer):
+#need to convert so that it stores the output in the queue
+def convertToGray(buff):
      print("going to convert to gray!")
-     # globals
-     outputDir    = 'frames'
+     outputDir    = 'frames' #global
 
-     # initialize frame count
-     count = 0
-
-     # get the next frame file name
-     inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
-
-     # load the next file
-     inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
-
-     while inputFrame is not None:
+     count = 0 #nitialize frame count
+     
+     while not buff.empty():
        print("Converting frame {}".format(count))
 
+       #take in the frame from the buffer
+       frameAsText = buff.get()
+
+       # decode the frame 
+       jpgRawImage = base64.b64decode(frameAsText)
+
+       # convert the raw frame to a numpy array
+       jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
+        
+       # get a jpg encoded frame
+       img = cv2.imdecode( jpgImage ,cv2.IMREAD_UNCHANGED)
+        
        # convert the image to grayscale
-       grayscaleFrame = cv2.cvtColor(inputFrame, cv2.COLOR_BGR2GRAY)
+       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+       #encode the frame as base 64 to make debugging easier
+       jpgAsText = base64.b64encode(greyFrame)
+
+       # add the frame to the buffer
+       buff.put(jpgAsText)
        
        # generate output file name
-       outFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
+       #outFileName = "{}/grayscale_{:04d}.jpg".format(outputBuffer, count)
 
        # write output file
-       cv2.imwrite(outFileName, grayscaleFrame)
+       #cv2.imwrite(outFileName, grayscaleFrame)
 
        count += 1
  
        # generate input file name for the next frame
-       inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
+       #inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
 
        # load the next frame
-       inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
+       #inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
+     print("finished converting!")
 
 def extractFrames(fileName, outputBuffer):
     print("going to extract frames!")
@@ -132,11 +135,15 @@ displayT = threading.Thread(target = displayFrames, args=(extractionQueue,)) #ma
 
 #gets to 10 frames in extract and deadlocks on extract with filled buffer
 #gray has issues putting frames into buffer
-try:
-    #grayT.start()
-    #extractT.start()
-    displayT.start()
-except:
-    print ("error starting the threads")
-
-
+#try:
+extractFrames(filename,extractionQueue)
+convertToGray(filename,extractionQueue)
+#somethign wrong with gray file, perhaps im not using the methods correctly
+     
+     #extractT.start()
+     #grayT.start()
+     #greyT.sleep(1000)
+     #displayT.start()
+     #displayT.sleep(100)
+#except:
+ #   print ("error starting the threads")
