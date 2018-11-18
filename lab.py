@@ -8,19 +8,17 @@ import queue
 import time
 
 
-#need to convert so that it stores the output in the queue
-def convertToGray(buff):
-     print("going to convert to gray!")
+#issue getting from buff
+def convertToGray(extractionQueue, displayQueue):
+     print("start grey!")
      outputDir    = 'frames' #global
 
-     count = 0 #nitialize frame count
+     count = 0 #initialize frame count
      
-     while not buff.empty():
-       print("Converting frame {}".format(count))
-
-       #take in the frame from the buffer
-       frameAsText = buff.get()
-
+     while not extractionQueue.empty() or not displayQueue.full():
+       #gets next frame
+       frameAsText = extractionQueue.get()
+       
        # decode the frame 
        jpgRawImage = base64.b64decode(frameAsText)
 
@@ -28,7 +26,9 @@ def convertToGray(buff):
        jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
         
        # get a jpg encoded frame
-       img = cv2.imdecode( jpgImage ,cv2.IMREAD_UNCHANGED)
+       img = cv2.imdecode(jpgImage ,cv2.IMREAD_UNCHANGED)
+       
+       print("Converting frame {}".format(count))
         
        # convert the image to grayscale
        greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -36,26 +36,15 @@ def convertToGray(buff):
        #encode the frame as base 64 to make debugging easier
        jpgAsText = base64.b64encode(greyFrame)
 
-       # add the frame to the buffer
-       buff.put(jpgAsText)
+       # add the frame to the next buffer
+       displayQueue.put(jpgAsText)
        
-       # generate output file name
-       #outFileName = "{}/grayscale_{:04d}.jpg".format(outputBuffer, count)
-
-       # write output file
-       #cv2.imwrite(outFileName, grayscaleFrame)
-
        count += 1
  
-       # generate input file name for the next frame
-       #inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
+     print("end grey!")
 
-       # load the next frame
-       #inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
-     print("finished converting!")
-
-def extractFrames(fileName, outputBuffer):
-    print("going to extract frames!")
+def extractFrames(fileName, extractionQueue):
+    print("start extract frames!")
     # Initialize frame count 
     count = 0
     
@@ -66,7 +55,8 @@ def extractFrames(fileName, outputBuffer):
     success,image = vidcap.read()
     
     print("Reading frame {} {} ".format(count, success))
-    while success:
+    #while success:
+    while success and not extractionQueue.full():
         # get a jpg encoded frame
         success, jpgImage = cv2.imencode('.jpg', image)
 
@@ -74,23 +64,23 @@ def extractFrames(fileName, outputBuffer):
         jpgAsText = base64.b64encode(jpgImage)
 
         # add the frame to the buffer
-        outputBuffer.put(jpgAsText)
+        extractionQueue.put(jpgAsText)
        
         success,image = vidcap.read()
         print('Reading frame {} {}'.format(count, success))
         count += 1
 
-    print("Frame extraction complete")
+    print("End extract")
 
 
-def displayFrames(inputBuffer):
-    print("going to display the frames now!") 
+def displayFrames(displayQueue):
+    print("start display! ") 
     # initialize frame count
     count = 0
     # go through each frame in the buffer until the buffer is empty
-    while not inputBuffer.empty():
+    while not displayQueue.empty():
         # get the next frame
-        frameAsText = inputBuffer.get()
+        frameAsText = displayQueue.get()
 
         # decode the frame 
         jpgRawImage = base64.b64decode(frameAsText)
@@ -111,39 +101,63 @@ def displayFrames(inputBuffer):
 
         count += 1
 
-    print("Finished displaying all frames")
+    print("end displaying")
     # cleanup the windows
     cv2.destroyAllWindows()
 
 
 
-#start of "main"
 filename = 'clip.mp4' #name of clip to load
-#semaphore for the system LIKELY NOT NEEDED
-syncSemaphore = threading.Semaphore()
 
-extractionQueue = queue.Queue() #shared queue, limited to 10 objects at a time
+emptySem = threading.Semaphore() #empty queue
+fullSem= threading.Semaphore() #full queue
+mutexSem= threading.Semaphore() #for mutual exclusion
+mutex = threading.Lock()
+
+extractionQueue = queue.Queue(10) #extract->grey queue
+displayQueue = queue.Queue()    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
-grayT = threading.Thread(target = convertToGray, args= (extractionQueue)) 
-displayT = threading.Thread(target = displayFrames, args=(extractionQueue,)) 
+grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
+displayT = threading.Thread(target = displayFrames, args=(displayQueue,)) 
 
-# extract the frames
+def producer(t):
+     while True:
+          print("setting producer ")
+          #sem_wait -> acquire
+          #sem_post -> release
+          emptySem.acquire()
+          mutex.acquire()
+          print("starting producer thread")
+          t.start()
+          mutex.release()
+          fullSem.release()
+          print("release all sems")
+          
+def consumer(t):
+     while True:
+          print(" starting consumer ")
+          fullSem.acquire()
+          mutex.acquire()
+          if not extractionQueue.empty() or displayQueue.empty():
+               print ("One or both queues are empty, wasting runtime anyways")
+          print("starting consumer process")
+          t.start()
+          mutex.release()
+          emptySem.release()
+
+#test relationship with extrac->grey so no limit on grey queue
+#likely cant modulate grey->display however
+#extractT,grayT,displayT
+
+
+#debugging, methods run normally
 #extractFrames(filename,extractionQueue)
-# display the frames
-#displayFrames(extractionQueue)
+#convertToGray(extractionQueue)
 
-#gets to 10 frames in extract and deadlocks on extract with filled buffer
-#gray has issues putting frames into buffer
-#try:
-extractFrames(filename,extractionQueue)
-convertToGray(extractionQueue)
-#somethign wrong with gray file, perhaps im not using the methods correctly
-     
-     #extractT.start()
-     #grayT.start()
-     #greyT.sleep(1000)
-     #displayT.start()
-     #displayT.sleep(100)
-#except:
- #   print ("error starting the threads")
+#debugging, methods run through threads
+extractT.start()
+grayT.start()
+#methods run through PC
+#consumer(grayT)
+#producer(extractT)
