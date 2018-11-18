@@ -15,6 +15,7 @@ def convertToGray(extractionQueue, displayQueue):
 
      count = 0 #initialize frame count
      
+     
      while not extractionQueue.empty() or not displayQueue.full():
        #gets next frame
        frameAsText = extractionQueue.get()
@@ -114,37 +115,39 @@ fullSem= threading.Semaphore() #full queue
 mutexSem= threading.Semaphore() #for mutual exclusion
 mutex = threading.Lock()
 
-extractionQueue = queue.Queue(10) #extract->grey queue
+extractionQueue = queue.Queue() #extract->grey queue
 displayQueue = queue.Queue()    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
 displayT = threading.Thread(target = displayFrames, args=(displayQueue,)) 
 
-def producer(t):
-     while True:
-          print("setting producer ")
-          #sem_wait -> acquire
-          #sem_post -> release
-          emptySem.acquire()
-          mutex.acquire()
-          print("starting producer thread")
-          t.start()
-          mutex.release()
-          fullSem.release()
-          print("release all sems")
-          
-def consumer(t):
-     while True:
-          print(" starting consumer ")
-          fullSem.acquire()
-          mutex.acquire()
-          if not extractionQueue.empty() or displayQueue.empty():
-               print ("One or both queues are empty, wasting runtime anyways")
-          print("starting consumer process")
-          t.start()
-          mutex.release()
-          emptySem.release()
+class ProducerThread(Thread):
+     def run(self):
+          while True:
+               print("setting producer ")
+               #sem_wait -> acquire
+               #sem_post -> release
+               #emptySem.acquire()
+               mutex.acquire()
+               print("starting producer thread")
+               t.start()
+               mutex.release()
+               #fullSem.release()
+               print("release all sems")
+
+class consumerThread(Thread):
+     def run(self):
+          while True:
+               print(" starting consumer ")
+               #fullSem.acquire()
+               mutex.acquire()
+               if not extractionQueue.empty() or displayQueue.empty():
+                    print ("One or both queues are empty, wasting runtime anyways")
+               print("starting consumer process")
+               t.start()
+               mutex.release()
+               #emptySem.release()
 
 #test relationship with extrac->grey so no limit on grey queue
 #likely cant modulate grey->display however
@@ -156,8 +159,12 @@ def consumer(t):
 #convertToGray(extractionQueue)
 
 #debugging, methods run through threads
-extractT.start()
-grayT.start()
+#Starting multithreads works with both eqs for ext and gray
+#display ends early on however
+#extractT.start()
+#grayT.start()
+#displayT.start()
+
 #methods run through PC
-#consumer(grayT)
-#producer(extractT)
+consumer(grayT)
+producer(extractT)
