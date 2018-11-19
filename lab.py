@@ -99,11 +99,11 @@ def convertToGray(extractionQueue, displayQueue):
        jpgAsText = base64.b64encode(greyFrame)
 
        #PRODUCER, stores to display
-       fullSem.acquire()
-       #emptySem2.acquire()
+       #fullSem.acquire()
+       emptySem2.acquire()
        displayQueue.put(jpgAsText)
-       emptySem.release()
-       #fullSem2.release()
+       #emptySem.release()
+       fullSem2.release()
 
       
        count += 1
@@ -129,10 +129,12 @@ def displayFrames(displayQueue):
     while True:
     #while not displayQueue.empty():
         if not displayQueue.empty():
+
+           #CONSUMER 2
            #get the next frame
-           fullSem.acquire()
+           fullSem2.acquire()
            frameAsText = displayQueue.get()
-           emptySem.release()
+           emptySem2.release()
 
            # decode the frame 
            jpgRawImage = base64.b64decode(frameAsText)
