@@ -7,9 +7,16 @@ import base64
 import queue
 import time
 
+emptySem = threading.Semaphore() #empty queue
+fullSem = threading.Semaphore(10) #full queue
+emptySem2 = threading.Semaphore() #empty queue
+fullSem2 = threading.Semaphore() #full queue
+mutexSem= threading.Semaphore() #for mutual exclusion
 
 #issue getting from buff
 def convertToGray(extractionQueue, displayQueue):
+     emptySem.acquire()
+     
      print("start grey!")
      outputDir    = 'frames' #global
 
@@ -17,6 +24,8 @@ def convertToGray(extractionQueue, displayQueue):
      
      
      while not extractionQueue.empty() or not displayQueue.full():
+
+       
        #gets next frame
        frameAsText = extractionQueue.get()
        
@@ -39,12 +48,17 @@ def convertToGray(extractionQueue, displayQueue):
 
        # add the frame to the next buffer
        displayQueue.put(jpgAsText)
-       
+
+      
        count += 1
- 
+
+     fullSem.release()
      print("end grey!")
 
 def extractFrames(fileName, extractionQueue):
+
+    fullSem.acquire()
+    
     print("start extract frames!")
     # Initialize frame count 
     count = 0
@@ -58,6 +72,7 @@ def extractFrames(fileName, extractionQueue):
     print("Reading frame {} {} ".format(count, success))
     #while success:
     while success and not extractionQueue.full():
+
         # get a jpg encoded frame
         success, jpgImage = cv2.imencode('.jpg', image)
 
@@ -71,6 +86,7 @@ def extractFrames(fileName, extractionQueue):
         print('Reading frame {} {}'.format(count, success))
         count += 1
 
+    fullSem.release()    
     print("End extract")
 
 
@@ -110,19 +126,19 @@ def displayFrames(displayQueue):
 
 filename = 'clip.mp4' #name of clip to load
 
-emptySem = threading.Semaphore() #empty queue
-fullSem= threading.Semaphore() #full queue
-mutexSem= threading.Semaphore() #for mutual exclusion
-mutex = threading.Lock()
-
-extractionQueue = queue.Queue() #extract->grey queue
+extractionQueue = queue.Queue(10) #extract->grey queue
 displayQueue = queue.Queue()    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
 displayT = threading.Thread(target = displayFrames, args=(displayQueue,)) 
 
-class ProducerThread(Thread):
+extractT.start()
+grayT.start()
+
+
+
+class producerThread(threading.Thread):
      def run(self):
           while True:
                print("setting producer ")
@@ -131,12 +147,12 @@ class ProducerThread(Thread):
                #emptySem.acquire()
                mutex.acquire()
                print("starting producer thread")
-               t.start()
+               #t.start()
                mutex.release()
                #fullSem.release()
                print("release all sems")
 
-class consumerThread(Thread):
+class consumerThread(threading.Thread):
      def run(self):
           while True:
                print(" starting consumer ")
@@ -145,18 +161,9 @@ class consumerThread(Thread):
                if not extractionQueue.empty() or displayQueue.empty():
                     print ("One or both queues are empty, wasting runtime anyways")
                print("starting consumer process")
-               t.start()
+               #t.start()
                mutex.release()
                #emptySem.release()
-
-#test relationship with extrac->grey so no limit on grey queue
-#likely cant modulate grey->display however
-#extractT,grayT,displayT
-
-
-#debugging, methods run normally
-#extractFrames(filename,extractionQueue)
-#convertToGray(extractionQueue)
 
 #debugging, methods run through threads
 #Starting multithreads works with both eqs for ext and gray
@@ -165,6 +172,9 @@ class consumerThread(Thread):
 #grayT.start()
 #displayT.start()
 
-#methods run through PC
-consumer(grayT)
-producer(extractT)
+
+#maybe needs init 
+#producerThread(extractT).start()
+#consumerThread(grayT).start()
+
+#freud said: The threads that obtain and decode the frames should communicate via PC sync
