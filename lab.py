@@ -8,10 +8,10 @@ import queue
 import time
 import Q #import Dr.Freudenthal's Queue
 
-emptySem = threading.Semaphore(10) #empty queue
+emptySem = threading.Semaphore() #empty queue
 fullSem = threading.Semaphore() #full queue
-emptySem2 = threading.Semaphore(10) #empty queue
-fullSem2 = threading.Semaphore(10) #full queue
+emptySem2 = threading.Semaphore() #empty queue
+fullSem2 = threading.Semaphore() #full queue
 
 def extractFrames(fileName, extractionQueue):
 
@@ -167,8 +167,8 @@ def displayFrames(displayQueue):
 
 filename = 'clip.mp4' #name of clip to load
 
-extractionQueue = queue.Queue() #extract->grey queue
-displayQueue = queue.Queue()    #grey->display queue
+extractionQueue = queue.Queue(10) #extract->grey queue
+displayQueue = queue.Queue(10)    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
