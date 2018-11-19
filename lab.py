@@ -7,57 +7,17 @@ import base64
 import queue
 import time
 
-emptySem = threading.Semaphore() #empty queue
-fullSem = threading.Semaphore(10) #full queue
-emptySem2 = threading.Semaphore() #empty queue
+emptySem = threading.Semaphore(10) #empty queue
+fullSem = threading.Semaphore() #full queue
+emptySem2 = threading.Semaphore(10) #empty queue
 fullSem2 = threading.Semaphore() #full queue
-mutexSem= threading.Semaphore() #for mutual exclusion
-
-#issue getting from buff
-def convertToGray(extractionQueue, displayQueue):
-     emptySem.acquire()
-     
-     print("start grey!")
-     outputDir    = 'frames' #global
-
-     count = 0 #initialize frame count
-     
-     
-     while not extractionQueue.empty() or not displayQueue.full():
-
-       
-       #gets next frame
-       frameAsText = extractionQueue.get()
-       
-       # decode the frame 
-       jpgRawImage = base64.b64decode(frameAsText)
-
-       # convert the raw frame to a numpy array
-       jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
-        
-       # get a jpg encoded frame
-       img = cv2.imdecode(jpgImage ,cv2.IMREAD_UNCHANGED)
-       
-       print("Converting frame {}".format(count))
-        
-       # convert the image to grayscale
-       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-       #encode the frame as base 64 to make debugging easier
-       jpgAsText = base64.b64encode(greyFrame)
-
-       # add the frame to the next buffer
-       displayQueue.put(jpgAsText)
-
-      
-       count += 1
-
-     fullSem.release()
-     print("end grey!")
 
 def extractFrames(fileName, extractionQueue):
 
-    fullSem.acquire()
+    #ORIGINAL WORKED WITH 1 PRODUCER 1 CONSUMER
+    #fullSem.acquire()
+
+    emptySem.acquire()
     
     print("start extract frames!")
     # Initialize frame count 
@@ -86,16 +46,75 @@ def extractFrames(fileName, extractionQueue):
         print('Reading frame {} {}'.format(count, success))
         count += 1
 
-    fullSem.release()    
+    #ORIGINAL WORKED  WITH 1 PRODUCER 1 CONSUMER
+    #emptySem.release()
+    
     print("End extract")
+
+    fullSem.release()
+
+
+def convertToGray(extractionQueue, displayQueue):
+     #THIS ONE WORKED!!  WITH 1 PRODUCER 1 CONSUMER
+     #emptySem.acquire()
+
+     fullSem.acquire()
+     #emptySem2.acquire()
+     
+     print("start grey!")
+     outputDir    = 'frames' #global
+
+     count = 0 #initialize frame count
+     
+     
+     while not extractionQueue.empty() or not displayQueue.full():
+     
+       #gets next frame
+       frameAsText = extractionQueue.get()
+       
+       # decode the frame 
+       jpgRawImage = base64.b64decode(frameAsText)
+
+       # convert the raw frame to a numpy array
+       jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
+        
+       # get a jpg encoded frame
+       img = cv2.imdecode(jpgImage ,cv2.IMREAD_UNCHANGED)
+       
+       print("Converting frame {}".format(count))
+        
+       # convert the image to grayscale
+       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+       #encode the frame as base 64 to make debugging easier
+       jpgAsText = base64.b64encode(greyFrame)
+
+       # add the frame to the next buffer
+       displayQueue.put(jpgAsText)
+
+      
+       count += 1
+
+
+     #ORIGINAL ONE, WORKED FOR 1 PRODUCER 1 CONSUMER!!
+     #fullSem.release()
+
+    
+     print("end grey!")
+
+     emptySem.release()
+     #fullSem2.release()
 
 
 def displayFrames(displayQueue):
+
+    fullSem2.acquire()
     print("start display! ") 
     # initialize frame count
     count = 0
     # go through each frame in the buffer until the buffer is empty
     while not displayQueue.empty():
+
         # get the next frame
         frameAsText = displayQueue.get()
 
@@ -115,19 +134,23 @@ def displayFrames(displayQueue):
         cv2.imshow("Video", img)
         if cv2.waitKey(42) and 0xFF == ord("q"):
             break
-
+        
         count += 1
+
+     
 
     print("end displaying")
     # cleanup the windows
     cv2.destroyAllWindows()
+
+    emptySem2.release()
 
 
 
 filename = 'clip.mp4' #name of clip to load
 
 extractionQueue = queue.Queue(10) #extract->grey queue
-displayQueue = queue.Queue()    #grey->display queue
+displayQueue = queue.Queue(10)    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
@@ -135,7 +158,7 @@ displayT = threading.Thread(target = displayFrames, args=(displayQueue,))
 
 extractT.start()
 grayT.start()
-
+displayT.start()
 
 
 class producerThread(threading.Thread):
