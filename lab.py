@@ -8,7 +8,7 @@ import queue
 import time
 import Q #import Dr.Freudenthal's Queue
 
-emptySem = threading.Semaphore() #empty queue
+emptySem = threading.Semaphore(10) #empty queue
 fullSem = threading.Semaphore() #full queue
 emptySem2 = threading.Semaphore(10) #empty queue
 fullSem2 = threading.Semaphore(10) #full queue
@@ -76,8 +76,10 @@ def convertToGray(extractionQueue, displayQueue):
      #while True:
      while not extractionQueue.empty() or not displayQueue.full():
      
-       #gets next frame
+       #CONSUMER, takes extracted frame
+       fullSem.acquire()
        frameAsText = extractionQueue.get()
+       emptySem.release()
        
        # decode the frame 
        jpgRawImage = base64.b64decode(frameAsText)
@@ -96,7 +98,7 @@ def convertToGray(extractionQueue, displayQueue):
        #encode the frame as base 64 to make debugging easier
        jpgAsText = base64.b64encode(greyFrame)
 
-       # add the frame to the next buffer
+       #PRODUCER, stores to display
        fullSem.acquire()
        #emptySem2.acquire()
        displayQueue.put(jpgAsText)
@@ -124,34 +126,35 @@ def displayFrames(displayQueue):
     # initialize frame count
     count = 0
     # go through each frame in the buffer until the buffer is empty
-    while not displayQueue.empty():
+    while True:
+    #while not displayQueue.empty():
+        if not displayQueue.empty():
+           #get the next frame
+           fullSem.acquire()
+           frameAsText = displayQueue.get()
+           emptySem.release()
 
-        # get the next frame
-        fullSem2.acquire()
-        frameAsText = displayQueue.get()
-        emptySem2.release()
+           # decode the frame 
+           jpgRawImage = base64.b64decode(frameAsText)
 
-        # decode the frame 
-        jpgRawImage = base64.b64decode(frameAsText)
-
-        # convert the raw frame to a numpy array
-        jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
+           # convert the raw frame to a numpy array
+           jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
         
-        # get a jpg encoded frame
-        img = cv2.imdecode( jpgImage ,cv2.IMREAD_UNCHANGED)
+           # get a jpg encoded frame
+           img = cv2.imdecode( jpgImage ,cv2.IMREAD_UNCHANGED)
 
-        print("Displaying frame {}".format(count))        
+           print("Displaying frame {}".format(count))        
 
-        # display the image in a window called "video" and wait 42ms
-        # before displaying the next frame
-        cv2.imshow("Video", img)
-        if cv2.waitKey(42) and 0xFF == ord("q"):
-            break
+           # display the image in a window called "video" and wait 42ms
+           # before displaying the next frame
+           if img:
+                cv2.imshow("Video", img)
+                if cv2.waitKey(42) and 0xFF == ord("q"):
+                     break
         
-        count += 1
+           count += 1
 
      
-
     print("end displaying")
     # cleanup the windows
     cv2.destroyAllWindows()
@@ -162,7 +165,7 @@ def displayFrames(displayQueue):
 
 filename = 'clip.mp4' #name of clip to load
 
-extractionQueue = queue.Queue(10) #extract->grey queue
+extractionQueue = queue.Queue() #extract->grey queue
 displayQueue = queue.Queue()    #grey->display queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
