@@ -6,20 +6,15 @@ import numpy as np
 import base64
 import queue
 import time
-import Q #import Dr.Freudenthal's Queue
 
-emptySem = threading.Semaphore() #empty queue
+emptySem = threading.Semaphore(10) #empty queue
 fullSem = threading.Semaphore() #full queue
-emptySem2 = threading.Semaphore() #empty queue
-fullSem2 = threading.Semaphore() #full queue
+lock = threading.Semaphore(0) #mutex
+emptySem2 = threading.Semaphore(10) #empty queue for display
+fullSem2 = threading.Semaphore() #full queue for display
+lock2 = threading.Semaphore(0) #mutex for display
 
 def extractFrames(fileName, extractionQueue):
-
-    #ORIGINAL WORKED WITH 1 PRODUCER 1 CONSUMER
-    #fullSem.acquire()
-
-    #attempt 2, works with 1P1C and no queue limit
-    #emptySem.acquire()
     
     print("start extract frames!")
     # Initialize frame count 
@@ -32,18 +27,28 @@ def extractFrames(fileName, extractionQueue):
     success,image = vidcap.read()
     
     print("Reading frame {} {} ".format(count, success))
-    #while success:
-    while success and not extractionQueue.full():
+    while success:
+    #while success and not extractionQueue.full():
 
         # get a jpg encoded frame
         success, jpgImage = cv2.imencode('.jpg', image)
 
+        #debugging, ensures a picture is actually there
+        #cv2.imshow("extractImg",jpgImage)
+        
+        
         #encode the frame as base 64 to make debugging easier
         jpgAsText = base64.b64encode(jpgImage)
 
+        #definitelyText
+        #print("producing the following for 1st queue")
+        #print(jpgAsText)
+        
         # add the frame to the buffer
         emptySem.acquire()
+        #lock.acquire()
         extractionQueue.put(jpgAsText)
+        #lock.release()
         fullSem.release()
        
         success,image = vidcap.read()
@@ -60,26 +65,23 @@ def extractFrames(fileName, extractionQueue):
 
 
 def convertToGray(extractionQueue, displayQueue):
-     #THIS ONE WORKED!!  WITH 1 PRODUCER 1 CONSUMER
-     #emptySem.acquire()
-
-     #works with no queue limit
-     #fullSem.acquire()
-     #emptySem2.acquire()
-     
      print("start grey!")
-     outputDir    = 'frames' #global
 
      count = 0 #initialize frame count
      
-     
-     #while True:
-     while not extractionQueue.empty() or not displayQueue.full():
+     while True:
+     #while not extractionQueue.empty() or not displayQueue.full():
      
        #CONSUMER, takes extracted frame
        fullSem.acquire()
+       #lock.acquire()
        frameAsText = extractionQueue.get()
+       #lock.release()
        emptySem.release()
+
+       #consumer1 debugger, seems like it works
+       #print("below is what is taken from queue1")
+       #print(frameAsText)
        
        # decode the frame 
        jpgRawImage = base64.b64decode(frameAsText)
@@ -87,22 +89,27 @@ def convertToGray(extractionQueue, displayQueue):
        # convert the raw frame to a numpy array
        jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
         
-       # get a jpg encoded frame
+       #get a jpg encoded frame
        img = cv2.imdecode(jpgImage ,cv2.IMREAD_UNCHANGED)
        
        print("Converting frame {}".format(count))
         
        # convert the image to grayscale
-       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+       #originally img
+       greyFrame = cv2.cvtColor(frameAsText, cv2.COLOR_BGR2GRAY)
 
        #encode the frame as base 64 to make debugging easier
        jpgAsText = base64.b64encode(greyFrame)
 
+       #producer 2 debugger, is definitely a bunch of text
+       #print("below is what is going into queue 2")
+       #print(jpgAsText)
+       
        #PRODUCER, stores to display
-       #fullSem.acquire()
        emptySem2.acquire()
-       displayQueue.put(jpgAsText)
-       #emptySem.release()
+       #lock2.acquire()
+       displayQueue.put(greyFrame)
+       #lock2.release()
        fullSem2.release()
 
       
@@ -128,13 +135,18 @@ def displayFrames(displayQueue):
     # go through each frame in the buffer until the buffer is empty
     while True:
     #while not displayQueue.empty():
-        if not displayQueue.empty():
-
-           #CONSUMER 2
-           #get the next frame
+        #if not displayQueue.empty():
+        
+           #CONSUMER 2, gets frame to display
            fullSem2.acquire()
+           #lock2.acquire()
            frameAsText = displayQueue.get()
+           #lock2.release()
            emptySem2.release()
+
+           #debugging
+           #print("consumer 2 is going to get the following")
+           #print(frameAsText)
 
            # decode the frame 
            jpgRawImage = base64.b64decode(frameAsText)
@@ -147,12 +159,15 @@ def displayFrames(displayQueue):
 
            print("Displaying frame {}".format(count))        
 
+           
+           #print(img)
            # display the image in a window called "video" and wait 42ms
            # before displaying the next frame
-           if img:
-                cv2.imshow("Video", img)
-                if cv2.waitKey(42) and 0xFF == ord("q"):
-                     break
+           #if img is not None:
+           #print("really showing the image!")
+           cv2.imshow("Video", img)
+           if cv2.waitKey(42) and 0xFF == ord("q"):
+               break
         
            count += 1
 
@@ -180,43 +195,24 @@ grayT.start()
 displayT.start()
 
 
-class producerThread(threading.Thread):
-     def run(self):
-          while True:
-               print("setting producer ")
-               #sem_wait -> acquire
-               #sem_post -> release
-               #emptySem.acquire()
-               
-               print("starting producer thread")
-               #t.start()
-               mutex.release()
-               #fullSem.release()
-               print("release all sems")
-
-class consumerThread(threading.Thread):
-     def run(self):
-          while True:
-               print(" starting consumer ")
-               #fullSem.acquire()
-               mutex.acquire()
-               if not extractionQueue.empty() or displayQueue.empty():
-                    print ("One or both queues are empty, wasting runtime anyways")
-               print("starting consumer process")
-               #t.start()
-               mutex.release()
-               #emptySem.release()
-
-#debugging, methods run through threads
-#Starting multithreads works with both eqs for ext and gray
-#display ends early on however
-#extractT.start()
-#grayT.start()
-#displayT.start()
-
-
-#maybe needs init 
-#producerThread(extractT).start()
-#consumerThread(grayT).start()
 
 #freud said: The threads that obtain and decode the frames should communicate via PC sync
+
+
+#print the type of data at each encode and decode to ensure that you dont goof something
+#don't need conversion of data?
+#FOR DEBUGGING do a base64 encode and then ensure that the same digits are the same before and after each queue to ensure that everything works
+
+
+#NOTES:
+#Extract Does it's job fine
+#Display does it's job fine
+
+#ISSUES
+#Need to fix GREYSCALE CONVERSION
+#Need to fix  LOCKS
+#Need to fix an exit protocol when it's done
+
+#Extract/Display work with Sems and any size que
+   #need to test out with lock??
+#went over sem implementation on Oct23
