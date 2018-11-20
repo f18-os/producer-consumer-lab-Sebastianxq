@@ -54,15 +54,8 @@ def extractFrames(fileName, extractionQueue):
         success,image = vidcap.read()
         print('Reading frame {} {}'.format(count, success))
         count += 1
-
-    #ORIGINAL WORKED  WITH 1 PRODUCER 1 CONSUMER
-    #emptySem.release()
     
     print("End extract")
-
-    #works with no queue limit
-    #fullSem.release()
-
 
 def convertToGray(extractionQueue, displayQueue):
      print("start grey!")
@@ -72,11 +65,9 @@ def convertToGray(extractionQueue, displayQueue):
      while True:
      #while not extractionQueue.empty() or not displayQueue.full():
      
-       #CONSUMER, takes extracted frame
+       #CONSUMER1, takes extracted frame
        fullSem.acquire()
-       #lock.acquire()
        frameAsText = extractionQueue.get()
-       #lock.release()
        emptySem.release()
 
        #consumer1 debugger, seems like it works
@@ -96,7 +87,7 @@ def convertToGray(extractionQueue, displayQueue):
         
        # convert the image to grayscale
        #originally img
-       greyFrame = cv2.cvtColor(frameAsText, cv2.COLOR_BGR2GRAY)
+       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
        #encode the frame as base 64 to make debugging easier
        jpgAsText = base64.b64encode(greyFrame)
@@ -108,31 +99,21 @@ def convertToGray(extractionQueue, displayQueue):
        #PRODUCER, stores to display
        emptySem2.acquire()
        #lock2.acquire()
-       displayQueue.put(greyFrame)
+       displayQueue.put(jpgAsText)
        #lock2.release()
        fullSem2.release()
 
-      
        count += 1
-
-
-     #ORIGINAL ONE, WORKED FOR 1 PRODUCER 1 CONSUMER!!
-     #fullSem.release()
 
      print("end grey!")
 
-     #Works with no queue limit
-     #emptySem.release()
-     #fullSem2.release()
-
+       
 
 def displayFrames(displayQueue):
-
-   
     print("start display! ") 
-    # initialize frame count
-    count = 0
-    # go through each frame in the buffer until the buffer is empty
+    
+    count = 0 #frameCount
+
     while True:
     #while not displayQueue.empty():
         #if not displayQueue.empty():
@@ -176,9 +157,6 @@ def displayFrames(displayQueue):
     # cleanup the windows
     cv2.destroyAllWindows()
 
-    #emptySem2.release()
-
-
 
 filename = 'clip.mp4' #name of clip to load
 
@@ -189,29 +167,22 @@ extractT = threading.Thread(target = extractFrames, args=(filename,extractionQue
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
 displayT = threading.Thread(target = displayFrames, args=(displayQueue,)) 
 
-#while True:
 extractT.start()
 grayT.start()
 displayT.start()
 
 
 
-#freud said: The threads that obtain and decode the frames should communicate via PC sync
-
-
-#print the type of data at each encode and decode to ensure that you dont goof something
-#don't need conversion of data?
-#FOR DEBUGGING do a base64 encode and then ensure that the same digits are the same before and after each queue to ensure that everything works
-
-
 #NOTES:
+#freud said: The threads that obtain and decode the frames should communicate via PC sync
+#FOR DEBUGGING do a base64 encode and then ensure that the same digits are the same before and after each queue to ensure that everything works
 #Extract Does it's job fine
 #Display does it's job fine
 
 #ISSUES
 #Need to fix GREYSCALE CONVERSION
 #Need to fix  LOCKS
-#Need to fix an exit protocol when it's done
+#Need to add an exit protocol when it's done
 
 #Extract/Display work with Sems and any size que
    #need to test out with lock??
