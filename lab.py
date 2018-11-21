@@ -9,10 +9,11 @@ import time
 
 emptySem = threading.Semaphore(10) #empty queue
 fullSem = threading.Semaphore() #full queue
-lock = threading.Semaphore(0) #mutex
+lock = threading.Lock() #mutex
 emptySem2 = threading.Semaphore(10) #empty queue for display
 fullSem2 = threading.Semaphore() #full queue for display
-lock2 = threading.Semaphore(0) #mutex for display
+lock2 = threading.Lock() #mutex for display
+
 
 def extractFrames(fileName, extractionQueue):
     print("start extract frames!")
@@ -23,18 +24,17 @@ def extractFrames(fileName, extractionQueue):
 
     success,image = vidcap.read() #read first image
     
-    print("Reading frame {} {} ".format(count, success))
     while success:
 
         #Producer 1, stores frame into queue
         emptySem.acquire()
-        #lock.acquire()
+        lock.acquire()
         extractionQueue.put(image)
-        #lock.release()
+        lock.release()
         fullSem.release()
        
         success,image = vidcap.read()
-        print('Reading frame {} {}'.format(count, success))
+        #print('Reading frame {} {}'.format(count, success))
         count += 1
     
     print("End extract")
@@ -48,10 +48,12 @@ def convertToGray(extractionQueue, displayQueue):
      
        #Consumer 1, takes extracted frame
        fullSem.acquire()
+       lock.acquire()
        colorFrame = extractionQueue.get()
+       lock.release()
        emptySem.release()
 
-       print("Converting frame {}".format(count))
+       #print("Converting frame {}".format(count))
         
        #convert the frame to grayscale
        greyFrame = cv2.cvtColor(colorFrame, cv2.COLOR_BGR2GRAY)
@@ -83,7 +85,7 @@ def displayFrames(displayQueue):
            #lock2.release()
            emptySem2.release()
 
-           print("Displaying frame {}".format(count))        
+           #print("Displaying frame {}".format(count))        
 
            #display the image in a window called "video" and wait 42ms
            cv2.imshow("Video", frameAsText)
