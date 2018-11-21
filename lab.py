@@ -39,15 +39,12 @@ def extractFrames(fileName, extractionQueue):
         
         #encode the frame as base 64 to make debugging easier
         jpgAsText = base64.b64encode(jpgImage)
-
-        #definitelyText
-        #print("producing the following for 1st queue")
-        #print(jpgAsText)
         
         # add the frame to the buffer
         emptySem.acquire()
         #lock.acquire()
-        extractionQueue.put(jpgAsText)
+        #extractionQueue.put(jpgAsText)
+        extractionQueue.put(image)
         #lock.release()
         fullSem.release()
        
@@ -87,19 +84,16 @@ def convertToGray(extractionQueue, displayQueue):
         
        # convert the image to grayscale
        #originally img
-       greyFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+       greyFrame = cv2.cvtColor(frameAsText, cv2.COLOR_BGR2GRAY)
 
        #encode the frame as base 64 to make debugging easier
        jpgAsText = base64.b64encode(greyFrame)
-
-       #producer 2 debugger, is definitely a bunch of text
-       #print("below is what is going into queue 2")
-       #print(jpgAsText)
        
        #PRODUCER, stores to display
        emptySem2.acquire()
        #lock2.acquire()
-       displayQueue.put(jpgAsText)
+       #displayQueue.put(jpgAsText)
+       displayQueue.put(greyFrame)
        #lock2.release()
        fullSem2.release()
 
@@ -125,10 +119,6 @@ def displayFrames(displayQueue):
            #lock2.release()
            emptySem2.release()
 
-           #debugging
-           #print("consumer 2 is going to get the following")
-           #print(frameAsText)
-
            # decode the frame 
            jpgRawImage = base64.b64decode(frameAsText)
 
@@ -146,7 +136,8 @@ def displayFrames(displayQueue):
            # before displaying the next frame
            #if img is not None:
            #print("really showing the image!")
-           cv2.imshow("Video", img)
+           #cv2.imshow("Video", img)
+           cv2.imshow("Video", frameAsText)
            if cv2.waitKey(42) and 0xFF == ord("q"):
                break
         
@@ -176,14 +167,17 @@ displayT.start()
 #NOTES:
 #freud said: The threads that obtain and decode the frames should communicate via PC sync
 #FOR DEBUGGING do a base64 encode and then ensure that the same digits are the same before and after each queue to ensure that everything works
-#Extract Does it's job fine
-#Display does it's job fine
+#using encoding works with extract->display
+#not encoding it works with extract-> display
 
 #ISSUES
 #Need to fix GREYSCALE CONVERSION
 #Need to fix  LOCKS
 #Need to add an exit protocol when it's done
+#include the semophores within call and put to simplify the process?
 
 #Extract/Display work with Sems and any size que
    #need to test out with lock??
 #went over sem implementation on Oct23
+
+
