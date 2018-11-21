@@ -16,7 +16,7 @@ fullSem2 = threading.Semaphore() #full queue for display
 
 
 def extractFrames(fileName, extractionQueue):
-    print("start extract frames!")
+    #print("start extract frames!")
      
     count = 0 #frame count
     
@@ -34,7 +34,7 @@ def extractFrames(fileName, extractionQueue):
         #print('Reading frame {} {}'.format(count, success))
         count += 1
     
-    print("End extract")
+    #print("End extract")
 
     #Create and enqueue flag (black frame) to signal EOF
     blank_image = np.zeros((0,0,0), np.uint8)
@@ -43,7 +43,11 @@ def extractFrames(fileName, extractionQueue):
     fullSem.release()
         
 def convertToGray(extractionQueue, displayQueue):
-     print("start grey!")
+     #print("start grey!")
+
+     #creates and encodes local black frame for flag comparison
+     blank_image = np.zeros((0,0,0), np.uint8)
+     blankText = base64.b64encode(blank_image)
 
      count = 0 #initialize frame count
      
@@ -56,13 +60,9 @@ def convertToGray(extractionQueue, displayQueue):
 
        #print("Converting frame {}".format(count))
 
-       #flag checker
-       blank_image = np.zeros((0,0,0), np.uint8)
-       colorText = base64.b64encode(colorFrame)
-       blankText = base64.b64encode(blank_image)
-       
+       #flag checker, if flag found, end loop
+       colorText = base64.b64encode(colorFrame)    
        if(colorText==blankText):
-           print("grey read the blank frame!")
            emptySem2.acquire()
            displayQueue.put(blank_image)
            fullSem2.release()
@@ -79,7 +79,7 @@ def convertToGray(extractionQueue, displayQueue):
        count += 1
 
 
-     print("end grey!")
+     #print("end grey!")
 
        
 
@@ -88,7 +88,11 @@ def displayFrames(displayQueue):
     frameInterval_s = 0.042         # inter-frame interval, in seconds
     nextFrameStart = time.time()
 
-    print(" start display! ") 
+    #Creates and endcodes an EOF frame
+    blank_image = np.zeros((0,0,0), np.uint8)
+    blankText = base64.b64encode(blank_image)
+
+    #print(" start display! ") 
     
     count = 0 #frameCount
 
@@ -100,11 +104,11 @@ def displayFrames(displayQueue):
            emptySem2.release()
 
            #print("Displaying frame {}".format(count))        
-           blank_image = np.zeros((0,0,0), np.uint8)
+
+           #checks for flag, if found, end loop and finish thread
            colorText = base64.b64encode(frameAsText)
-           blankText = base64.b64encode(blank_image)
            if(colorText==blankText):
-               print("display read the blank frame!")
+               print("Finished processing file!")
                break
                                       
            #display the image in a window called "video" and wait 42ms
@@ -126,7 +130,7 @@ def displayFrames(displayQueue):
            count += 1
 
      
-    print("end displaying")
+    #print("end displaying")
     # cleanup the windows
     cv2.destroyAllWindows()
 
