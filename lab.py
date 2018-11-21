@@ -21,7 +21,6 @@ def extractFrames(fileName, extractionQueue):
     count = 0 #frame count
     
     vidcap = cv2.VideoCapture(fileName) #open video file
-
     success,image = vidcap.read() #read first image
     
     while success:
@@ -37,6 +36,12 @@ def extractFrames(fileName, extractionQueue):
     
     print("End extract")
 
+    #Create and enqueue flag (black frame) to signal EOF
+    blank_image = np.zeros((0,0,0), np.uint8)
+    emptySem.acquire()
+    extractionQueue.put(blank_image)
+    fullSem.release()
+        
 def convertToGray(extractionQueue, displayQueue):
      print("start grey!")
 
@@ -50,7 +55,19 @@ def convertToGray(extractionQueue, displayQueue):
        emptySem.release()
 
        #print("Converting frame {}".format(count))
-        
+
+       #flag checker
+       blank_image = np.zeros((0,0,0), np.uint8)
+       colorText = base64.b64encode(colorFrame)
+       blankText = base64.b64encode(blank_image)
+       
+       if(colorText==blankText):
+           print("grey read the blank frame!")
+           emptySem2.acquire()
+           displayQueue.put(blank_image)
+           fullSem2.release()
+           break
+
        #convert the frame to grayscale
        greyFrame = cv2.cvtColor(colorFrame, cv2.COLOR_BGR2GRAY)
        
@@ -60,6 +77,7 @@ def convertToGray(extractionQueue, displayQueue):
        fullSem2.release()
 
        count += 1
+
 
      print("end grey!")
 
@@ -82,8 +100,12 @@ def displayFrames(displayQueue):
            emptySem2.release()
 
            #print("Displaying frame {}".format(count))        
-
-
+           blank_image = np.zeros((0,0,0), np.uint8)
+           colorText = base64.b64encode(frameAsText)
+           blankText = base64.b64encode(blank_image)
+           if(colorText==blankText):
+               print("display read the blank frame!")
+               break
                                       
            #display the image in a window called "video" and wait 42ms
            cv2.imshow("Video", frameAsText)
