@@ -9,10 +9,10 @@ import time
 
 emptySem = threading.Semaphore(10) #empty queue
 fullSem = threading.Semaphore() #full queue
-lock = threading.Lock() #mutex
+#lock = threading.Lock() #mutex
 emptySem2 = threading.Semaphore(10) #empty queue for display
 fullSem2 = threading.Semaphore() #full queue for display
-lock2 = threading.Lock() #mutex for display
+#lock2 = threading.Lock() #mutex for display
 
 
 def extractFrames(fileName, extractionQueue):
@@ -28,9 +28,7 @@ def extractFrames(fileName, extractionQueue):
 
         #Producer 1, stores frame into queue
         emptySem.acquire()
-        lock.acquire()
         extractionQueue.put(image)
-        lock.release()
         fullSem.release()
        
         success,image = vidcap.read()
@@ -48,9 +46,7 @@ def convertToGray(extractionQueue, displayQueue):
      
        #Consumer 1, takes extracted frame
        fullSem.acquire()
-       lock.acquire()
        colorFrame = extractionQueue.get()
-       lock.release()
        emptySem.release()
 
        #print("Converting frame {}".format(count))
@@ -60,9 +56,7 @@ def convertToGray(extractionQueue, displayQueue):
        
        #Producer 2, stores to display
        emptySem2.acquire()
-       #lock2.acquire()
        displayQueue.put(greyFrame)
-       #lock2.release()
        fullSem2.release()
 
        count += 1
@@ -72,6 +66,10 @@ def convertToGray(extractionQueue, displayQueue):
        
 
 def displayFrames(displayQueue):
+    #vars for ensuring 24fps
+    frameInterval_s = 0.042         # inter-frame interval, in seconds
+    nextFrameStart = time.time()
+
     print(" start display! ") 
     
     count = 0 #frameCount
@@ -80,17 +78,28 @@ def displayFrames(displayQueue):
         
            #Consumer 2, gets frame to display
            fullSem2.acquire()
-           #lock2.acquire()
            frameAsText = displayQueue.get()
-           #lock2.release()
            emptySem2.release()
 
            #print("Displaying frame {}".format(count))        
 
+
+                                      
            #display the image in a window called "video" and wait 42ms
            cv2.imshow("Video", frameAsText)
-           if cv2.waitKey(42) and 0xFF == ord("q"):
+
+
+           #delay to ensure a consistent framerate during execution
+           delay_s = nextFrameStart - time.time()
+           nextFrameStart += frameInterval_s
+           delay_ms = int(max(1, 1000 * delay_s))
+           #print ("delay = %d ms" % delay_ms)
+           if cv2.waitKey(delay_ms) and 0xFF == ord("q"):
                break
+           
+           #old delay
+           #if cv2.waitKey(42) and 0xFF == ord("q"):
+           #    break
         
            count += 1
 
