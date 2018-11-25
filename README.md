@@ -44,5 +44,9 @@ them in sequence
 
 Note: You may have ancillary objects and method in order to make you're code easer to understand and implement.
 
-
+#producer-consumer explanation
+#producer loads a buffer and consumer takes from a buffer
+#to solve issue with producer making more data than needed, let it
+#sleep/discard data when buffer is full and same for consumer, sleep or dont
+#pull from buffer when buffer is empty
 
