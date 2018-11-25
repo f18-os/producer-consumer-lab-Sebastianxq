@@ -73,7 +73,7 @@ def convertToGray(extractionQueue, displayQueue):
            emptySem2.acquire()
            lock2.acquire()
            displayQueue.put(blank_image)
-           lock.release()
+           lock2.release()
            fullSem2.release()
            break
 
