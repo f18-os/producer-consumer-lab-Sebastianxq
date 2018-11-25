@@ -1,13 +1,13 @@
 
 #!/usr/bin/env python3
 
-import threading
-import cv2
-import numpy as np
-import base64
-import queue
-import time
-import Q
+import threading      #For Semaphores, locks and threads
+import cv2            #Needed for Frame Extraction
+import numpy as np    #|
+import base64         #used for creating EOF flag
+import time           #needed for framerate
+#import queue         #used for debugging
+import Q              #User created queue class
 
 emptySem = threading.Semaphore(10) #empty queue
 fullSem = threading.Semaphore(0) #full queue
@@ -16,6 +16,7 @@ emptySem2 = threading.Semaphore(10) #empty queue
 fullSem2 = threading.Semaphore(0) #full queue
 lock2 = threading.Lock() #mutex
 
+#Extracts frames from given video and stores them into a queue
 def extractFrames(fileName, extractionQueue):
     print("start extract frames!")
      
@@ -25,7 +26,6 @@ def extractFrames(fileName, extractionQueue):
     success,image = vidcap.read() #read first image
     
     while success:
-
         #Producer 1, stores frame into queue
         emptySem.acquire()
         lock.acquire()
@@ -46,7 +46,8 @@ def extractFrames(fileName, extractionQueue):
     extractionQueue.put(blank_image)
     lock.release()
     fullSem.release()
-        
+
+#Takes frames from a queue, converts to B&W and then stores in different queue
 def convertToGray(extractionQueue, displayQueue):
      print("start grey!")
 
@@ -56,8 +57,7 @@ def convertToGray(extractionQueue, displayQueue):
 
      count = 0 #initialize frame count
      
-     while True:
-     
+     while True:     
        #Consumer 1, takes extracted frame
        fullSem.acquire()
        lock.acquire()
@@ -89,11 +89,10 @@ def convertToGray(extractionQueue, displayQueue):
 
        count += 1
 
-
      print("end grey!")
-
        
 
+#Takes frames from queue and displays them to the user at ~24fps
 def displayFrames(displayQueue):
     #vars for ensuring 24fps
     frameInterval_s = 0.042         # inter-frame interval, in seconds
@@ -108,7 +107,6 @@ def displayFrames(displayQueue):
     count = 0 #frameCount
 
     while True:
-        
            #Consumer 2, gets frame to display
            fullSem2.acquire()
            lock2.acquire()
@@ -135,38 +133,29 @@ def displayFrames(displayQueue):
            #print ("delay = %d ms" % delay_ms)
            if cv2.waitKey(delay_ms) and 0xFF == ord("q"):
                break
-           
-           #old delay
-           #if cv2.waitKey(42) and 0xFF == ord("q"):
-           #    break
         
            count += 1
-
      
     print("end displaying")
-    # cleanup the windows
-    cv2.destroyAllWindows()
+    cv2.destroyAllWindows() #cleanup the windows
 
 
 filename = 'clip.mp4' #name of clip to load
 
+#python lib queues, used for debugging
 #extractionQueue = queue.Queue(10) #extract->grey queue
 #displayQueue = queue.Queue(10)    #grey->display queue
 
+#initialize queues
 extractionQueue = Q.Queue() #Extract Queue
 displayQueue = Q.Queue()    #Display Queue
 
+#Creates threads for each method with the necessary args
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
 displayT = threading.Thread(target = displayFrames, args=(displayQueue,)) 
 
+#Start threads
 extractT.start()
 grayT.start()
 displayT.start()
-
-#TODO
-#update to allow self defined queue
-#own queue should include the semaphores and mutex with get and put
-
-
-
