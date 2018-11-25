@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 
 import threading
@@ -6,17 +7,17 @@ import numpy as np
 import base64
 import queue
 import time
+import Q
 
 emptySem = threading.Semaphore(10) #empty queue
-fullSem = threading.Semaphore() #full queue
-#lock = threading.Lock() #mutex
-emptySem2 = threading.Semaphore(10) #empty queue for display
-fullSem2 = threading.Semaphore() #full queue for display
-#lock2 = threading.Lock() #mutex for display
-
+fullSem = threading.Semaphore(0) #full queue
+lock = threading.Lock() #mutex
+emptySem2 = threading.Semaphore(10) #empty queue
+fullSem2 = threading.Semaphore(0) #full queue
+lock2 = threading.Lock() #mutex
 
 def extractFrames(fileName, extractionQueue):
-    #print("start extract frames!")
+    print("start extract frames!")
      
     count = 0 #frame count
     
@@ -27,23 +28,27 @@ def extractFrames(fileName, extractionQueue):
 
         #Producer 1, stores frame into queue
         emptySem.acquire()
+        lock.acquire()
         extractionQueue.put(image)
+        lock.release()
         fullSem.release()
        
         success,image = vidcap.read()
         #print('Reading frame {} {}'.format(count, success))
         count += 1
     
-    #print("End extract")
+    print("End extract")
 
     #Create and enqueue flag (black frame) to signal EOF
     blank_image = np.zeros((0,0,0), np.uint8)
     emptySem.acquire()
+    lock.acquire()
     extractionQueue.put(blank_image)
+    lock.release()
     fullSem.release()
         
 def convertToGray(extractionQueue, displayQueue):
-     #print("start grey!")
+     print("start grey!")
 
      #creates and encodes local black frame for flag comparison
      blank_image = np.zeros((0,0,0), np.uint8)
@@ -55,7 +60,9 @@ def convertToGray(extractionQueue, displayQueue):
      
        #Consumer 1, takes extracted frame
        fullSem.acquire()
+       lock.acquire()
        colorFrame = extractionQueue.get()
+       lock.release()
        emptySem.release()
 
        #print("Converting frame {}".format(count))
@@ -64,7 +71,9 @@ def convertToGray(extractionQueue, displayQueue):
        colorText = base64.b64encode(colorFrame)    
        if(colorText==blankText):
            emptySem2.acquire()
+           lock2.acquire()
            displayQueue.put(blank_image)
+           lock.release()
            fullSem2.release()
            break
 
@@ -73,13 +82,15 @@ def convertToGray(extractionQueue, displayQueue):
        
        #Producer 2, stores to display
        emptySem2.acquire()
+       lock2.acquire()
        displayQueue.put(greyFrame)
+       lock2.release()
        fullSem2.release()
 
        count += 1
 
 
-     #print("end grey!")
+     print("end grey!")
 
        
 
@@ -92,7 +103,7 @@ def displayFrames(displayQueue):
     blank_image = np.zeros((0,0,0), np.uint8)
     blankText = base64.b64encode(blank_image)
 
-    #print(" start display! ") 
+    print(" start display! ") 
     
     count = 0 #frameCount
 
@@ -100,7 +111,9 @@ def displayFrames(displayQueue):
         
            #Consumer 2, gets frame to display
            fullSem2.acquire()
+           lock2.acquire()
            frameAsText = displayQueue.get()
+           lock2.release()
            emptySem2.release()
 
            #print("Displaying frame {}".format(count))        
@@ -130,15 +143,18 @@ def displayFrames(displayQueue):
            count += 1
 
      
-    #print("end displaying")
+    print("end displaying")
     # cleanup the windows
     cv2.destroyAllWindows()
 
 
 filename = 'clip.mp4' #name of clip to load
 
-extractionQueue = queue.Queue(10) #extract->grey queue
-displayQueue = queue.Queue(10)    #grey->display queue
+#extractionQueue = queue.Queue(10) #extract->grey queue
+#displayQueue = queue.Queue(10)    #grey->display queue
+
+extractionQueue = Q.Queue() #Extract Queue
+displayQueue = Q.Queue()    #Display Queue
 
 extractT = threading.Thread(target = extractFrames, args=(filename,extractionQueue))
 grayT = threading.Thread(target = convertToGray, args=(extractionQueue,displayQueue)) 
@@ -148,19 +164,9 @@ extractT.start()
 grayT.start()
 displayT.start()
 
+#TODO
+#update to allow self defined queue
+#own queue should include the semaphores and mutex with get and put
 
-
-#NOTES:
-#freud said: The threads that obtain and decode the frames should communicate via PC sync
-#FOR DEBUGGING do a base64 encode and then ensure that the same digits are the same before and after each queue to ensure that everything works
-#using encoding works with extract->display
-#not encoding it works with extract-> display
-
-#ISSUES
-#Need to fix LOCKS
-#Need to add an exit protocol when it's done
-#include the semophores within call and put to simplify the process?
-
-#went over sem implementation on Oct23
 
 
