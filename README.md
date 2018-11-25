@@ -1,3 +1,15 @@
+# Instructions for Running Lab.py
+
+* The lab can be run by typing "python3 lab.py" to your terminal.
+
+* If you desire to load a different video file you must specify the new name within the lab.py file.
+
+* Q.py must be within the same directory as Lab.py for it to run, as Q.py contains the queue class. 
+
+* The structure for the user defined queue was originally found online at https://www.pythoncentral.io/use-queue-beginners-guide/, and modified by myself.
+
+
+
 # Producer Consumer Lab
 
 For this lab you will implement a trivial producer-consumer system using
